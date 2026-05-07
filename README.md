@@ -13,11 +13,11 @@ A mobile app for meteor observers to record the trajectory direction of a meteor
 
 ### Gesture detection
 
-The IMU-based trigger watches the gyroscope Y-axis (long axis of the phone). A rotation above **3.5 rad/s** peak within an **800 ms** window is classified as a valid flip. A **1.5 s** cooldown prevents double-triggers.
+The IMU-based trigger detects the characteristic flip gesture (picking up a face-down phone) using the gyroscope. A cooldown period prevents double-triggers.
 
 ### Aiming
 
-Orientation is derived from the phone's rotation vector sensor (or accelerometer fallback). The app accumulates a rolling window of samples and considers the reading **stable** when angular jitter falls below a configurable threshold (default **4.0°**). In IMU mode the capture fires automatically; in volume-button mode the user confirms manually.
+Orientation is derived from the phone's rotation vector sensor (or accelerometer fallback). The app considers the reading **stable** when angular jitter falls below a configurable threshold. In IMU mode the capture fires automatically; in volume-button mode the user confirms manually.
 
 ---
 
