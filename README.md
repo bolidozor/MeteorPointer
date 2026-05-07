@@ -1,97 +1,118 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Meteor Pointer
 
-# Getting Started
+A mobile app for [Bolidozor](https://www.bolidozor.cz) observers to record meteor trajectory directions using a smartphone's orientation sensors. After spotting a meteor, the observer aims the phone at the start and end of the trail; the resulting angular segment is synced to the Bolidozor network for multi-station triangulation.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+Available in **English** and **Czech**.
 
-## Step 1: Start Metro
+## How it works
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+1. Place the phone **face-down** nearby during a meteor watch. The app runs in the background with the screen dimmed to red to preserve night vision.
+2. When a meteor appears, **pick up the phone** — the gyroscope detects the characteristic flip gesture and triggers a session automatically. Alternatively, press a **volume button** if you prefer manual triggering.
+3. The app guides you to aim at the **start** of the trail and hold still. A haptic/audio cue confirms the capture.
+4. Swing to the **end** of the trail and hold still for the second capture.
+5. Optionally fill in event parameters (magnitude, colour, sound, fragmentation, shower association).
+6. The report is stored locally and queued for upload to the Bolidozor backend.
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+### Gesture detection
+
+The IMU-based trigger watches the gyroscope Y-axis (long axis of the phone). A rotation above **3.5 rad/s** peak within an **800 ms** window is classified as a valid flip. A **1.5 s** cooldown prevents double-triggers.
+
+### Aiming
+
+Orientation is derived from the phone's rotation vector sensor (or accelerometer fallback). The app accumulates a rolling window of samples and considers the reading **stable** when angular jitter falls below a configurable threshold (default **4.0°**). In IMU mode the capture fires automatically; in volume-button mode the user confirms manually.
+
+## Screens
+
+| Screen | Description |
+|---|---|
+| Home | Launch a session or navigate to other screens |
+| Session | Live IMU feed, session state, event log |
+| Aiming | Step-by-step start/end trajectory capture |
+| Reports | List of saved trajectory reports with upload action |
+| Training | Practice the flip-and-aim gesture without recording |
+| How to Observe | In-app guide for observers |
+| Sensor Debug | Raw IMU and orientation data |
+| Settings | Trigger method, aiming axis, thresholds, audio/haptics, backend URL |
+
+## Tech stack
+
+- **React Native 0.84** · TypeScript
+- **Zustand** — session and settings state
+- **React Navigation** (native stack)
+- **TanStack Query** — backend sync
+- **AsyncStorage** — local persistence
+- **Bun** — package manager
+
+## Development setup
+
+> Make sure you have the [React Native environment](https://reactnative.dev/docs/set-up-your-environment) configured for your target platform.
 
 ```sh
-# Using npm
-npm start
+# Install dependencies
+bun install
 
-# OR using Yarn
-yarn start
-```
-
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
-```
-
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
+# iOS — install native pods (first time or after native dep changes)
 bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
 bundle exec pod install
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+### Run
 
 ```sh
-# Using npm
-npm run ios
+# Start Metro bundler
+bun start
 
-# OR using Yarn
-yarn ios
+# Android
+bun android
+
+# iOS
+bun ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+### Lint & type-check
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+```sh
+bun run lint
+bun run typecheck
+```
 
-## Step 3: Modify your app
+### Tests
 
-Now that you have successfully run the app, let's make changes!
+```sh
+bun test
+```
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+## Settings reference
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+| Setting | Default | Description |
+|---|---|---|
+| Trigger method | IMU gesture | How a meteor event is triggered (`imu` or `volume`) |
+| Aiming axis | `+Y` (top edge) | Which phone edge to point at the sky |
+| Stabilization threshold | 4.0° | Maximum jitter (degrees) to consider orientation stable |
+| Audio cues | on | Beeps on stable / capture / done |
+| Haptic cues | on | Vibration on capture events |
+| Color scheme | Normal | `normal` (adaptive) or `deep-night` (pure black) |
+| Backend URL | — | Bolidozor API endpoint for report uploads |
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+## Project structure
 
-## Congratulations! :tada:
+```
+src/
+  features/
+    home/          # Home screen
+    sessions/      # Session logic, IMU detection, aiming, state store
+    reports/       # Saved trajectory reports
+    settings/      # Settings screen and Zustand store
+    training/      # Training mode
+    guide/         # In-app observer guide
+    sensors/       # Raw sensor debug screen
+  native/          # RN native module wrappers (IMU, brightness, volume key, …)
+  navigation/      # Stack navigator and route types
+  i18n/            # Translations (en / cs)
+  theme/           # Adaptive red night-vision theme
+```
 
-You've successfully run and modified your React Native App. :partying_face:
+## Related
 
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+- [Bolidozor network](https://www.bolidozor.cz)
+- [React Native docs](https://reactnative.dev)
