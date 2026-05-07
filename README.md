@@ -1,6 +1,6 @@
 # Meteor Pointer
 
-A mobile app for meteor observers to record trajectory directions of meteors using a smartphone's orientation sensors. After spotting a meteor, the observer aims the phone at the start and end of the trail; the two captured aim points are stored locally and can be synced to a backend for multi-station triangulation.
+A mobile app for meteor observers to record the trajectory direction of a meteor using a smartphone's orientation sensors. After spotting a meteor, the observer aims the phone at the start and end of the trail; the two captured aim points are stored locally and can be synced to a backend.
 
 ## How it works
 
