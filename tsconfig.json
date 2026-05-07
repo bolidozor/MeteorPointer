@@ -1,0 +1,16 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@features/*": ["src/features/*"],
+      "@navigation/*": ["src/navigation/*"],
+      "@native/*": ["src/native/*"],
+      "@theme/*": ["src/theme/*"],
+      "@assets/*": ["assets/*"],
+      "@i18n/*": ["src/i18n/*"]
+    }
+  },
+  "include": ["src", "index.js", "App.tsx", "tests"]
+}
