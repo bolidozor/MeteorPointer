@@ -15,6 +15,14 @@ export interface AimPoint {
   capturedAt: number;
 }
 
+/** Geographic location of the observation site at measurement time. */
+export interface ObservationSite {
+  lat: number;
+  lon: number;
+  accuracy: number;
+  capturedAt: number;
+}
+
 export interface EventParams {
   magnitude: number | null;
   color: string | null;
@@ -69,6 +77,7 @@ export interface MeteorReport {
   createdAt: number;
   quality: number;
   params?: EventParams;
+  site?: ObservationSite | null; // GPS of the observation site; null if unavailable
   synced?: boolean; // true once the report has been accepted by the API
 }
 
