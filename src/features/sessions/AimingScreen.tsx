@@ -233,7 +233,7 @@ export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
               />
               <Metric
                 label="GPS"
-                value={location ? `±${location.accuracy.toFixed(0)} m` : 'acquiring…'}
+                value={location ? `±${location.accuracy.toFixed(0)} m` : 'off (test build)'}
                 theme={theme}
               />
               <Metric
