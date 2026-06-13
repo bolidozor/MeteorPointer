@@ -61,6 +61,38 @@ const en = {
   settings: {
     language: 'Language',
   },
+  account: {
+    title: 'Network account',
+    tile: 'Network',
+    serverUrl: 'API server URL',
+    serverPlaceholder: 'https://...',
+    consentTitle: 'Consent & data licence',
+    loadConsent: 'Load consent document',
+    agree: 'I agree and connect',
+    agreeRequired: 'Please read and agree to continue.',
+    setServerFirst: 'Set the API server URL first.',
+    registering: 'Connecting…',
+    connected: 'Connected',
+    notConnected: 'Not connected',
+    deviceId: 'Device ID',
+    recoveryTitle: 'Recovery phrase',
+    recoveryHint:
+      'Write this down. It is the only way to restore your data on a new phone, and it is shown only once.',
+    recoverySaved: 'I have saved it',
+    pending: (n: number) => `${n} measurement(s) waiting to sync`,
+    allSynced: 'All measurements synced',
+    syncNow: 'Sync now',
+    syncing: 'Syncing…',
+    lastError: (e: string) => `Last error: ${e}`,
+    deleteData: 'Delete my data',
+    deleteDataConfirm:
+      'Delete all your measurements from the server? Your device stays registered.',
+    disconnect: 'Disconnect & delete account',
+    disconnectConfirm:
+      'Delete your device identity and all server data? This cannot be undone.',
+    delete: 'Delete',
+    cancel: 'Cancel',
+  },
 };
 
 type T = typeof en;
@@ -125,6 +157,38 @@ const cs: T = {
   },
   settings: {
     language: 'Jazyk',
+  },
+  account: {
+    title: 'Síťový účet',
+    tile: 'Síť',
+    serverUrl: 'Adresa API serveru',
+    serverPlaceholder: 'https://...',
+    consentTitle: 'Souhlas a licence dat',
+    loadConsent: 'Načíst text souhlasu',
+    agree: 'Souhlasím a připojit',
+    agreeRequired: 'Pro pokračování si prosím přečti a odsouhlas podmínky.',
+    setServerFirst: 'Nejdřív nastav adresu API serveru.',
+    registering: 'Připojuji…',
+    connected: 'Připojeno',
+    notConnected: 'Nepřipojeno',
+    deviceId: 'ID zařízení',
+    recoveryTitle: 'Obnovovací fráze',
+    recoveryHint:
+      'Zapiš si ji. Je to jediný způsob, jak obnovit svá data na novém telefonu, a zobrazí se jen jednou.',
+    recoverySaved: 'Uložil(a) jsem si ji',
+    pending: (n: number) => `Čeká na synchronizaci: ${n} měření`,
+    allSynced: 'Všechna měření synchronizována',
+    syncNow: 'Synchronizovat',
+    syncing: 'Synchronizuji…',
+    lastError: (e: string) => `Poslední chyba: ${e}`,
+    deleteData: 'Smazat moje data',
+    deleteDataConfirm:
+      'Smazat všechna tvá měření ze serveru? Zařízení zůstane zaregistrované.',
+    disconnect: 'Odpojit a smazat účet',
+    disconnectConfirm:
+      'Smazat identitu zařízení a všechna data na serveru? Tuto akci nelze vrátit.',
+    delete: 'Smazat',
+    cancel: 'Zrušit',
   },
 };
 

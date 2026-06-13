@@ -4,6 +4,7 @@ export type RootStackParamList = {
   Aiming: { eventTimestamp: number };
   Training: undefined;
   Reports: undefined;
+  Account: undefined;
   Settings: undefined;
   SensorDebug: undefined;
   HowToObserve: undefined;

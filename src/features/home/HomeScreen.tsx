@@ -22,6 +22,9 @@ export function HomeScreen(): React.JSX.Element {
   const t = useTranslation();
   const reports = useSessionStore((state) => state.reports);
   const events = useSessionStore((state) => state.events);
+  const unsyncedCount = useSessionStore(
+    (state) => state.reports.filter((r) => !r.synced).length,
+  );
 
   const lastEvent = events[0];
   const lastEventLabel = lastEvent
@@ -71,6 +74,13 @@ export function HomeScreen(): React.JSX.Element {
           label={t.home.tiles.guide}
           glyph="✦"
           onPress={() => navigation.navigate('HowToObserve')}
+          theme={theme}
+        />
+        <NavTile
+          label={t.account.tile}
+          glyph="☁"
+          badge={unsyncedCount > 0 ? String(unsyncedCount) : undefined}
+          onPress={() => navigation.navigate('Account')}
           theme={theme}
         />
         <NavTile

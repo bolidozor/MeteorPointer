@@ -7,6 +7,7 @@ import { SessionScreen } from '@features/sessions/SessionScreen';
 import { AimingScreen } from '@features/sessions/AimingScreen';
 import { TrainingScreen } from '@features/training/TrainingScreen';
 import { ReportsScreen } from '@features/reports/ReportsScreen';
+import { AccountScreen } from '@features/account/AccountScreen';
 import { SettingsScreen } from '@features/settings/SettingsScreen';
 import { SensorDebugScreen } from '@features/sensors/SensorDebugScreen';
 import { HowToObserveScreen } from '@features/guide/HowToObserveScreen';
@@ -25,6 +26,7 @@ export function RootNavigator(): React.JSX.Element {
         <Stack.Screen name="Aiming" component={AimingScreen} />
         <Stack.Screen name="Training" component={TrainingScreen} />
         <Stack.Screen name="Reports" component={ReportsScreen} />
+        <Stack.Screen name="Account" component={AccountScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="SensorDebug" component={SensorDebugScreen} />
         <Stack.Screen name="HowToObserve" component={HowToObserveScreen} />

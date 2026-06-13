@@ -69,6 +69,7 @@ export interface MeteorReport {
   createdAt: number;
   quality: number;
   params?: EventParams;
+  synced?: boolean; // true once the report has been accepted by the API
 }
 
 export interface SessionSnapshot {
