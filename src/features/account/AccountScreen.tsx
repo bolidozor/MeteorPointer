@@ -42,6 +42,7 @@ export function AccountScreen(): React.JSX.Element {
   const unregister = useDeviceStore((s) => s.unregister);
 
   const pending = useSessionStore((s) => s.reports.filter((r) => !r.synced).length);
+  const addReport = useSessionStore((s) => s.addReport);
   const sync = useSyncStatus();
 
   const [consent, setConsent] = useState<ConsentDoc | null>(null);
@@ -79,6 +80,18 @@ export function AccountScreen(): React.JSX.Element {
     } finally {
       setBusy(false);
     }
+  };
+
+  const sendTestMeasurement = () => {
+    const now = Date.now();
+    addReport({
+      eventTimestamp: now,
+      startPoint: { alt: 45, az: 100, jitter: 0.5, capturedAt: now },
+      endPoint: { alt: 50, az: 130, jitter: 0.5, capturedAt: now + 1500 },
+      quality: 0.9,
+      site: null,
+    });
+    flushOutbox();
   };
 
   const confirmDeleteData = () =>
@@ -189,6 +202,11 @@ export function AccountScreen(): React.JSX.Element {
               label={sync.syncing ? t.syncing : t.syncNow}
               onPress={() => flushOutbox()}
               disabled={sync.syncing || pending === 0}
+              theme={theme}
+            />
+            <SecondaryButton
+              label={t.testMeasurement}
+              onPress={sendTestMeasurement}
               theme={theme}
             />
             <SecondaryButton label={t.deleteData} onPress={confirmDeleteData} theme={theme} />

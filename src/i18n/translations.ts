@@ -92,6 +92,7 @@ const en = {
       'Delete your device identity and all server data? This cannot be undone.',
     delete: 'Delete',
     cancel: 'Cancel',
+    testMeasurement: 'Send test measurement',
   },
 };
 
@@ -189,6 +190,7 @@ const cs: T = {
       'Smazat identitu zařízení a všechna data na serveru? Tuto akci nelze vrátit.',
     delete: 'Smazat',
     cancel: 'Zrušit',
+    testMeasurement: 'Odeslat testovací měření',
   },
 };
 
