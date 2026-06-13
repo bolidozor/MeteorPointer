@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Test builds (Autorizace branch) connect to the API over plain HTTP on the
+  local network, so cleartext must be permitted. Production deployments serve
+  the API over HTTPS via an external reverse proxy; this file should be scoped
+  or removed for a production release.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

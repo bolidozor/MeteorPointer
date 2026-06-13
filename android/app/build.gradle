@@ -82,8 +82,10 @@ android {
         applicationId "cz.bolidozor.meteorpointer"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        // Branch-tagged version so test builds from the Autorizace branch are
+        // clearly distinct from standard releases.
+        versionName "1.0-Autorizace"
     }
     signingConfigs {
         debug {
