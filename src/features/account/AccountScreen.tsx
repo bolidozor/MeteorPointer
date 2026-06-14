@@ -191,11 +191,6 @@ export function AccountScreen(): React.JSX.Element {
               disabled={sync.syncing || pending === 0}
               theme={theme}
             />
-            <SecondaryButton
-              label={t.webLogin}
-              onPress={() => navigation.navigate('WebLogin')}
-              theme={theme}
-            />
             <SecondaryButton label={t.deleteData} onPress={confirmDeleteData} theme={theme} />
             <DangerButton label={t.disconnect} onPress={confirmDisconnect} theme={theme} />
           </View>

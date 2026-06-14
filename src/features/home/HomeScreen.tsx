@@ -54,6 +54,19 @@ export function HomeScreen(): React.JSX.Element {
           <Text style={styles.startLabel}>{t.home.startButton}</Text>
           <Text style={styles.startSub}>{t.home.startSub}</Text>
         </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.webLoginButton,
+            { borderColor: theme.border },
+            pressed && styles.tilePressed,
+          ]}
+          onPress={() => navigation.navigate('WebLogin')}
+        >
+          <Text style={[styles.webLoginText, { color: theme.muted }]}>
+            ⌁ {t.account.webLogin}
+          </Text>
+        </Pressable>
       </View>
 
       <View style={styles.tiles}>
@@ -211,6 +224,18 @@ const styles = StyleSheet.create({
   startSub: {
     fontSize: 12,
     color: '#00000088',
+    letterSpacing: 1,
+  },
+  webLoginButton: {
+    marginTop: 18,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+  },
+  webLoginText: {
+    fontSize: 13,
+    fontWeight: '600',
     letterSpacing: 1,
   },
 
