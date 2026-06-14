@@ -91,7 +91,7 @@ export function HomeScreen(): React.JSX.Element {
         />
         <NavTile
           label={t.account.tile}
-          glyph="☁"
+          glyph="⇅"
           badge={unsyncedCount > 0 ? String(unsyncedCount) : undefined}
           onPress={() => navigation.navigate('Account')}
           theme={theme}
