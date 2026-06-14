@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 
@@ -25,8 +25,10 @@ export function WebLoginScreen(): React.JSX.Element {
   const theme = useAdaptiveRedTheme();
   const t = useTranslation().account;
   const getAccessToken = useDeviceStore((s) => s.getAccessToken);
+  const route = useRoute<RouteProp<RootStackParamList, 'WebLogin'>>();
 
-  const [code, setCode] = useState('');
+  // Pre-filled when arriving from a scanned QR deep link (meteorpointer://weblogin?code=…).
+  const [code, setCode] = useState(route.params?.code ?? '');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export function WebLoginScreen(): React.JSX.Element {
         {error && <Text style={[styles.err, { color: theme.buttonDanger }]}>{error}</Text>}
 
         <Pressable
-          onPress={() => navigation.navigate('Account')}
+          onPress={() => navigation.navigate('Home')}
           style={({ pressed }) => [
             styles.button,
             { backgroundColor: theme.buttonSecondary },

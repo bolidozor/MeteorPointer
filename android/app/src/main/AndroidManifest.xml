@@ -30,6 +30,13 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+        <!-- Deep link from a scanned web sign-in QR: meteorpointer://weblogin?code=… -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="meteorpointer" android:host="weblogin" />
+        </intent-filter>
       </activity>
     </application>
 </manifest>

@@ -5,7 +5,7 @@ export type RootStackParamList = {
   Training: undefined;
   Reports: undefined;
   Account: undefined;
-  WebLogin: undefined;
+  WebLogin: { code?: string } | undefined;
   Settings: undefined;
   SensorDebug: undefined;
   HowToObserve: undefined;

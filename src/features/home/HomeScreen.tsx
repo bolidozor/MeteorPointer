@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
+  BackHandler,
   Pressable,
   SafeAreaView,
   StatusBar,
@@ -7,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { useSessionStore } from '@features/sessions/useSessionStore';
@@ -30,6 +31,18 @@ export function HomeScreen(): React.JSX.Element {
   const lastEventLabel = lastEvent
     ? new Date(lastEvent.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : null;
+
+  // On the home screen the hardware Back button quits the app (the in-app
+  // screens have their own back buttons), so there is a clear way to exit.
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        BackHandler.exitApp();
+        return true;
+      });
+      return () => sub.remove();
+    }, []),
+  );
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: theme.background }]}>
@@ -120,6 +133,12 @@ export function HomeScreen(): React.JSX.Element {
             {t.home.noEvents}
           </Text>
         )}
+        <Pressable
+          onPress={() => BackHandler.exitApp()}
+          style={({ pressed }) => [styles.exitButton, pressed && styles.tilePressed]}
+        >
+          <Text style={[styles.exitText, { color: theme.muted }]}>✕ {t.account.exit}</Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -292,5 +311,15 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 11,
     letterSpacing: 0.3,
+  },
+  exitButton: {
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  exitText: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
 });

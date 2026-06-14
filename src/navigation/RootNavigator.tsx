@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './types';
 import { HomeScreen } from '@features/home/HomeScreen';
@@ -15,9 +15,15 @@ import { HowToObserveScreen } from '@features/guide/HowToObserveScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+// Deep links from a scanned QR code: meteorpointer://weblogin?code=XXXX-XXXX
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: ['meteorpointer://'],
+  config: { screens: { WebLogin: 'weblogin' } },
+};
+
 export function RootNavigator(): React.JSX.Element {
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
       <Stack.Navigator
         initialRouteName="Home"
         screenOptions={{ headerShown: false, animation: 'fade' }}

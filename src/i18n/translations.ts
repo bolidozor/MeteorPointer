@@ -92,12 +92,13 @@ const en = {
       'Delete your device identity and all server data? This cannot be undone.',
     delete: 'Delete',
     cancel: 'Cancel',
-    webLogin: 'Web sign-in',
-    webLoginHint: 'Enter the code shown on the website to sign in there.',
+    webLogin: 'Authorize web login',
+    webLoginHint: 'Authorize a sign-in on the web — enter the code shown in the browser.',
     code: 'Code from the website',
     approve: 'Approve',
     approving: 'Approving…',
     approved: 'Signed in on the web ✓',
+    exit: 'Quit app',
   },
 };
 
@@ -195,12 +196,13 @@ const cs: T = {
       'Smazat identitu zařízení a všechna data na serveru? Tuto akci nelze vrátit.',
     delete: 'Smazat',
     cancel: 'Zrušit',
-    webLogin: 'Přihlásit web',
-    webLoginHint: 'Zadej kód zobrazený na webu a přihlas se tam.',
+    webLogin: 'Autorizovat web',
+    webLoginHint: 'Autorizuj přihlášení na webu — zadej kód zobrazený v prohlížeči.',
     code: 'Kód z webu',
     approve: 'Schválit',
     approving: 'Schvaluji…',
     approved: 'Web přihlášen ✓',
+    exit: 'Ukončit aplikaci',
   },
 };
 
