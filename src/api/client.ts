@@ -123,4 +123,11 @@ export const api = {
 
   deleteDevice: (token: string, deviceId: string) =>
     request<{ ok: boolean }>(`/v1/devices/${deviceId}`, { method: 'DELETE', token }),
+
+  approveWebLogin: (token: string, userCode: string) =>
+    request<{ ok: boolean }>('/v1/web/approve', {
+      method: 'POST',
+      token,
+      body: { user_code: userCode },
+    }),
 };
