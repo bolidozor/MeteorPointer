@@ -4,9 +4,11 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationListener
 import android.location.LocationManager
-import android.os.CancellationSignal
+import android.os.Looper
 import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -14,16 +16,34 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.WritableMap
 
 /**
- * Minimal one-shot location fix for the observation site.
+ * Location for the observation site.
  *
- * Deliberately a plain (legacy) native module — no codegen — so it builds
- * cleanly on React Native 0.84's New Architecture via the interop layer, unlike
- * @react-native-community/geolocation whose codegen fails to build here, and
- * expo-location which has no Expo SDK compatible with RN 0.84.1 yet.
- * Uses the platform LocationManager (no Google Play Services dependency).
+ * Plain (legacy) native module — no codegen — so it builds on React Native 0.84.
+ * Uses the platform LocationManager (no Google Play Services). To return a fix
+ * immediately (like a maps app), it (1) reports the freshest cached location
+ * from any provider — network/passive are instant — and (2) keeps a live
+ * subscription on the network + GPS providers so the cached fix stays current
+ * and refines to GPS accuracy.
  */
 class LocationModule(private val reactContext: ReactApplicationContext) :
-  ReactContextBaseJavaModule(reactContext) {
+  ReactContextBaseJavaModule(reactContext), LifecycleEventListener {
+
+  private val lm: LocationManager? =
+    reactContext.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+
+  @Volatile private var latest: Location? = null
+  private var listening = false
+
+  private val listener = LocationListener { loc ->
+    val current = latest
+    if (current == null || loc.time >= current.time) {
+      latest = loc
+    }
+  }
+
+  init {
+    reactContext.addLifecycleEventListener(this)
+  }
 
   override fun getName(): String = NAME
 
@@ -32,6 +52,62 @@ class LocationModule(private val reactContext: ReactApplicationContext) :
     val coarse = reactContext.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
     return fine == PackageManager.PERMISSION_GRANTED ||
       coarse == PackageManager.PERMISSION_GRANTED
+  }
+
+  private fun startUpdates() {
+    val manager = lm ?: return
+    if (listening || !hasPermission()) {
+      return
+    }
+    listening = true
+    for (provider in listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)) {
+      if (!manager.allProviders.contains(provider)) {
+        continue
+      }
+      try {
+        manager.requestLocationUpdates(provider, 1000L, 0f, listener, Looper.getMainLooper())
+      } catch (e: SecurityException) {
+        // permission revoked mid-flight — ignore
+      }
+    }
+  }
+
+  private fun stopUpdates() {
+    if (!listening) {
+      return
+    }
+    listening = false
+    try {
+      lm?.removeUpdates(listener)
+    } catch (e: SecurityException) {
+      // ignore
+    }
+  }
+
+  /** Freshest location across the live subscription and every provider's cache. */
+  private fun bestKnown(): Location? {
+    val manager = lm ?: return latest
+    var best = latest
+    val providers = listOf(
+      LocationManager.GPS_PROVIDER,
+      LocationManager.NETWORK_PROVIDER,
+      LocationManager.PASSIVE_PROVIDER,
+    )
+    for (provider in providers) {
+      if (!manager.allProviders.contains(provider)) {
+        continue
+      }
+      val loc =
+        try {
+          manager.getLastKnownLocation(provider)
+        } catch (e: SecurityException) {
+          null
+        } ?: continue
+      if (best == null || loc.time > best.time) {
+        best = loc
+      }
+    }
+    return best
   }
 
   private fun toMap(loc: Location): WritableMap =
@@ -48,45 +124,30 @@ class LocationModule(private val reactContext: ReactApplicationContext) :
       promise.reject("PERMISSION", "Location permission not granted")
       return
     }
-
-    val lm = reactContext.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-    if (lm == null) {
-      promise.reject("UNAVAILABLE", "Location service unavailable")
-      return
+    startUpdates()
+    val best = bestKnown()
+    if (best != null) {
+      promise.resolve(toMap(best))
+    } else {
+      promise.reject("NO_FIX", "No location fix available yet")
     }
+  }
 
-    val provider = when {
-      lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
-      lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-      else -> null
+  override fun onHostResume() {
+    // Resubscribe only if a caller had already asked for location.
+    if (latest != null) {
+      startUpdates()
     }
-    if (provider == null) {
-      promise.reject("UNAVAILABLE", "No location provider enabled")
-      return
-    }
+  }
 
-    val lastKnown: Location? =
-      try {
-        lm.getLastKnownLocation(provider)
-      } catch (e: SecurityException) {
-        null
-      }
+  override fun onHostPause() = stopUpdates()
 
-    try {
-      lm.getCurrentLocation(provider, CancellationSignal(), reactContext.mainExecutor) { loc ->
-        val result = loc ?: lastKnown
-        if (result != null) {
-          promise.resolve(toMap(result))
-        } else {
-          promise.reject("NO_FIX", "Could not obtain a location fix")
-        }
-      }
-    } catch (e: SecurityException) {
-      promise.reject("PERMISSION", "Location permission not granted", e)
-    } catch (e: Exception) {
-      if (lastKnown != null) promise.resolve(toMap(lastKnown))
-      else promise.reject("ERROR", e.message, e)
-    }
+  override fun onHostDestroy() = stopUpdates()
+
+  override fun invalidate() {
+    stopUpdates()
+    reactContext.removeLifecycleEventListener(this)
+    super.invalidate()
   }
 
   companion object {
