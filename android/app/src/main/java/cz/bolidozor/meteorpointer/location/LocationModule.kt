@@ -35,10 +35,19 @@ class LocationModule(private val reactContext: ReactApplicationContext) :
   private var listening = false
 
   private val listener = LocationListener { loc ->
-    val current = latest
-    if (current == null || loc.time >= current.time) {
-      latest = loc
-    }
+    latest = chooseBetter(loc, latest)
+  }
+
+  /**
+   * Prefer the more accurate fix (so a precise GPS reading is not overwritten by
+   * a frequent coarse network reading), but refresh if the kept fix went stale.
+   */
+  private fun chooseBetter(candidate: Location, current: Location?): Location {
+    if (current == null) return candidate
+    if (candidate.time - current.time > STALE_MS) return candidate
+    if (!candidate.hasAccuracy()) return current
+    if (!current.hasAccuracy()) return candidate
+    return if (candidate.accuracy <= current.accuracy) candidate else current
   }
 
   init {
@@ -103,9 +112,7 @@ class LocationModule(private val reactContext: ReactApplicationContext) :
         } catch (e: SecurityException) {
           null
         } ?: continue
-      if (best == null || loc.time > best.time) {
-        best = loc
-      }
+      best = chooseBetter(loc, best)
     }
     return best
   }
@@ -152,5 +159,7 @@ class LocationModule(private val reactContext: ReactApplicationContext) :
 
   companion object {
     const val NAME = "MeteorLocationModule"
+    // Keep the most accurate fix unless the kept one is older than this.
+    private const val STALE_MS = 60_000L
   }
 }

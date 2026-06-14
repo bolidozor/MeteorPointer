@@ -14,7 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { useImu } from '@native/useImu';
-import { useLocation } from '@native/useLocation';
+import { isGoodFix, useLocation } from '@native/useLocation';
 import { useLowPassImu } from '@native/useLowPassImu';
 import { useSettings } from '@features/settings/useSettings';
 import { toOrientation } from '@features/sessions/orientation';
@@ -433,15 +433,23 @@ export function SensorDebugScreen(): React.JSX.Element {
           <View style={styles.sourceRow}>
             <View style={[
               styles.sourceBadge,
-              { backgroundColor: gps ? '#1a3a1a' : '#3a1a1a',
-                borderColor:     gps ? '#4a9a4a' : '#9a4a4a' },
+              isGoodFix(gps)
+                ? { backgroundColor: '#1a3a1a', borderColor: '#4a9a4a' }
+                : gps
+                  ? { backgroundColor: '#3a2e1a', borderColor: '#9a8a4a' }
+                  : { backgroundColor: '#3a1a1a', borderColor: '#9a4a4a' },
             ]}>
-              <Text style={[styles.sourceBadgeText, { color: gps ? '#7aff7a' : '#ff7a7a' }]}>
-                {gps
-                  ? '● Fix'
-                  : locationGranted === false
-                    ? '○ Bez oprávnění'
-                    : '○ Hledám signál…'}
+              <Text style={[
+                styles.sourceBadgeText,
+                { color: isGoodFix(gps) ? '#7aff7a' : gps ? '#ffd87a' : '#ff7a7a' },
+              ]}>
+                {isGoodFix(gps)
+                  ? '● GPS fix'
+                  : gps
+                    ? '● Hrubá poloha (síť)'
+                    : locationGranted === false
+                      ? '○ Bez oprávnění'
+                      : '○ Hledám signál…'}
               </Text>
             </View>
             {gps && (

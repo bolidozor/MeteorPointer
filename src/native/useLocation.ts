@@ -9,6 +9,17 @@ export interface GeoFix {
   capturedAt: number; // epoch ms
 }
 
+// A fix at or below this accuracy (metres) is treated as a genuine GPS fix.
+// Coarser values are typically a network/cell fix — far more than enough for
+// trajectory triangulation (the phone's ~1-3° angular error dominates), but we
+// prefer and wait for a real satellite fix.
+export const GOOD_GPS_ACCURACY_M = 30;
+
+/** True if `fix` is a non-null, sufficiently accurate GPS fix. */
+export function isGoodFix(fix: GeoFix | null): boolean {
+  return fix != null && fix.accuracy > 0 && fix.accuracy <= GOOD_GPS_ACCURACY_M;
+}
+
 interface LocationNative {
   getCurrentPosition(): Promise<GeoFix>;
 }

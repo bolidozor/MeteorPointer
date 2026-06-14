@@ -11,7 +11,7 @@ import { useIsFocused } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { useImu } from '@native/useImu';
-import { useLocation, type GeoFix } from '@native/useLocation';
+import { GOOD_GPS_ACCURACY_M, isGoodFix, useLocation, type GeoFix } from '@native/useLocation';
 import { emitCue } from '@native/cues';
 import { useVolumeKey } from '@native/useVolumeKey';
 import { useSettings } from '@features/settings/useSettings';
@@ -236,6 +236,13 @@ export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
                 value={location ? `±${location.accuracy.toFixed(0)} m` : 'acquiring…'}
                 theme={theme}
               />
+              {!isGoodFix(location) && (
+                <Text style={[styles.gpsWarn, { color: theme.buttonDanger }]}>
+                  {location
+                    ? `⚠ Poloha jen ±${location.accuracy.toFixed(0)} m — počkej na přesný GPS fix (≤ ${GOOD_GPS_ACCURACY_M} m)`
+                    : '⚠ Čekám na GPS polohu — jdi pod volné nebe'}
+                </Text>
+              )}
               <Metric
                 label="Stable"
                 value={
@@ -385,6 +392,11 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 14,
     fontVariant: ['tabular-nums'],
+  },
+  gpsWarn: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
   },
   button: {
     borderRadius: 11,
