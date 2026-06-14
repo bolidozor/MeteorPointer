@@ -17,6 +17,7 @@ import type { RootStackParamList } from '@navigation/types';
 
 import { type ConsentDoc, api } from '@api/client';
 import { useDeviceStore } from '@auth/useDeviceStore';
+import { getCurrentFix } from '@native/useLocation';
 import { useSettings } from '@features/settings/useSettings';
 import { useSessionStore } from '@features/sessions/useSessionStore';
 import { flushOutbox, useSyncStatus } from '@sync/syncEngine';
@@ -82,14 +83,15 @@ export function AccountScreen(): React.JSX.Element {
     }
   };
 
-  const sendTestMeasurement = () => {
+  const sendTestMeasurement = async () => {
+    const site = await getCurrentFix(); // real GPS fix (null if denied/unavailable)
     const now = Date.now();
     addReport({
       eventTimestamp: now,
       startPoint: { alt: 45, az: 100, jitter: 0.5, capturedAt: now },
       endPoint: { alt: 50, az: 130, jitter: 0.5, capturedAt: now + 1500 },
       quality: 0.9,
-      site: null,
+      site,
     });
     flushOutbox();
   };
