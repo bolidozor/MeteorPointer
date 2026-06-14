@@ -43,6 +43,8 @@ export function SettingsScreen(): React.JSX.Element {
   const setLanguage = useSettings((state) => state.setLanguage);
   const colorScheme = useSettings((state) => state.colorScheme);
   const setColorScheme = useSettings((state) => state.setColorScheme);
+  const simulateSensors = useSettings((state) => state.simulateSensors);
+  const setSimulateSensors = useSettings((state) => state.setSimulateSensors);
 
   const t = useTranslation();
 
@@ -185,6 +187,7 @@ export function SettingsScreen(): React.JSX.Element {
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <SettingSwitch label="Audio cues" value={audioEnabled} onValueChange={setAudioEnabled} theme={theme} />
           <SettingSwitch label="Haptic cues" value={hapticEnabled} onValueChange={setHapticEnabled} theme={theme} />
+          <SettingSwitch label="Simulate sensors (no compass — test)" value={simulateSensors} onValueChange={setSimulateSensors} theme={theme} />
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}> 

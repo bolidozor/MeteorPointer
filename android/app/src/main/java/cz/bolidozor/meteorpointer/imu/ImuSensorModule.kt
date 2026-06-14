@@ -40,6 +40,10 @@ class ImuSensorModule(private val reactContext: ReactApplicationContext) :
   private var startCount = 0   // reference-counted — sensor stays on while any caller holds a start
   private var registered = false
   private var listenerCount = 0
+  // TEST ONLY: when true, emit IMU even without a magnetometer/gyroscope,
+  // substituting zeros for the missing sensor so devices without a compass can
+  // still run the measurement flow (azimuth will read 0).
+  private var simulate = false
 
   private val bootToWallOffsetMs: Long = System.currentTimeMillis() - SystemClock.elapsedRealtime()
 
@@ -55,7 +59,14 @@ class ImuSensorModule(private val reactContext: ReactApplicationContext) :
 
   @ReactMethod
   fun isAvailable(promise: Promise) {
-    promise.resolve(accelSensor != null && gyroSensor != null && magSensor != null)
+    val real = accelSensor != null && gyroSensor != null && magSensor != null
+    // In simulate mode the accelerometer alone is enough; missing sensors are zeroed.
+    promise.resolve(real || (simulate && accelSensor != null))
+  }
+
+  @ReactMethod
+  fun setSimulate(enabled: Boolean) {
+    simulate = enabled
   }
 
   @ReactMethod
@@ -96,8 +107,8 @@ class ImuSensorModule(private val reactContext: ReactApplicationContext) :
     if (event.timestamp - lastEmitNs < intervalNs) return
 
     val accelNow = accel ?: return
-    val gyroNow  = gyro  ?: return
-    val magNow   = mag   ?: return
+    val gyroNow  = gyro  ?: if (simulate) ZERO_VEC else return
+    val magNow   = mag   ?: if (simulate) ZERO_VEC else return
     // rotVec may still be null on the very first tick — that is fine.
 
     lastEmitNs = event.timestamp
@@ -155,7 +166,8 @@ class ImuSensorModule(private val reactContext: ReactApplicationContext) :
     // Best-effort — rotation vector may not be present on all devices.
     rotVecSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
 
-    registered = accelOk && gyroOk && magOk
+    // In simulate mode the accelerometer alone is enough (missing sensors zeroed).
+    registered = if (simulate) accelOk else (accelOk && gyroOk && magOk)
     if (!registered) {
       sensorManager.unregisterListener(this)
       lastEmitNs = 0L
@@ -184,5 +196,6 @@ class ImuSensorModule(private val reactContext: ReactApplicationContext) :
   companion object {
     const val NAME = "ImuSensorModule"
     const val EVENT_NAME = "ImuSensorSample"
+    private val ZERO_VEC = FloatArray(3) // [0,0,0] — substituted for missing sensors in simulate mode
   }
 }
