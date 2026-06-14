@@ -17,7 +17,6 @@ import type { RootStackParamList } from '@navigation/types';
 
 import { type ConsentDoc, api } from '@api/client';
 import { useDeviceStore } from '@auth/useDeviceStore';
-import { getCurrentFix } from '@native/useLocation';
 import { useSettings } from '@features/settings/useSettings';
 import { useSessionStore } from '@features/sessions/useSessionStore';
 import { flushOutbox, useSyncStatus } from '@sync/syncEngine';
@@ -43,7 +42,6 @@ export function AccountScreen(): React.JSX.Element {
   const unregister = useDeviceStore((s) => s.unregister);
 
   const pending = useSessionStore((s) => s.reports.filter((r) => !r.synced).length);
-  const addReport = useSessionStore((s) => s.addReport);
   const sync = useSyncStatus();
 
   const [consent, setConsent] = useState<ConsentDoc | null>(null);
@@ -81,19 +79,6 @@ export function AccountScreen(): React.JSX.Element {
     } finally {
       setBusy(false);
     }
-  };
-
-  const sendTestMeasurement = async () => {
-    const site = await getCurrentFix(); // real GPS fix (null if denied/unavailable)
-    const now = Date.now();
-    addReport({
-      eventTimestamp: now,
-      startPoint: { alt: 45, az: 100, jitter: 0.5, capturedAt: now },
-      endPoint: { alt: 50, az: 130, jitter: 0.5, capturedAt: now + 1500 },
-      quality: 0.9,
-      site,
-    });
-    flushOutbox();
   };
 
   const confirmDeleteData = () =>
@@ -204,11 +189,6 @@ export function AccountScreen(): React.JSX.Element {
               label={sync.syncing ? t.syncing : t.syncNow}
               onPress={() => flushOutbox()}
               disabled={sync.syncing || pending === 0}
-              theme={theme}
-            />
-            <SecondaryButton
-              label={t.testMeasurement}
-              onPress={sendTestMeasurement}
               theme={theme}
             />
             <SecondaryButton label={t.deleteData} onPress={confirmDeleteData} theme={theme} />

@@ -5,7 +5,6 @@ import {
   Platform,
   type EmitterSubscription,
 } from 'react-native';
-import { useSettings } from '@features/settings/useSettings';
 
 export interface ImuData {
   accel: { x: number; y: number; z: number };
@@ -24,7 +23,6 @@ interface ImuNativeModule {
   start: (updateIntervalMs: number) => void;
   stop: () => void;
   isAvailable: () => Promise<boolean>;
-  setSimulate?: (enabled: boolean) => void;
   addListener?: (eventName: string) => void;
   removeListeners?: (count: number) => void;
 }
@@ -41,7 +39,6 @@ const imuEmitter =
 export function useImu(options?: UseImuOptions): ImuData | null {
   const { intervalMs = DEFAULT_INTERVAL_MS } = options ?? {};
   const [sample, setSample] = useState<ImuData | null>(null);
-  const simulate = useSettings((state) => state.simulateSensors);
 
   const interval = useMemo(() => Math.max(20, intervalMs), [intervalMs]);
 
@@ -56,7 +53,6 @@ export function useImu(options?: UseImuOptions): ImuData | null {
 
     const eventName = imuNative.EVENT_NAME ?? FALLBACK_EVENT_NAME;
 
-    imuNative.setSimulate?.(simulate);
     imuNative
       .isAvailable()
       .then((available) => {
@@ -82,7 +78,7 @@ export function useImu(options?: UseImuOptions): ImuData | null {
       subscription?.remove();
       imuNative.stop();
     };
-  }, [interval, simulate]);
+  }, [interval]);
 
   return sample;
 }

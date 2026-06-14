@@ -12,7 +12,6 @@ interface SettingsState {
   triggerMethod: 'imu' | 'volume';
   language: Locale;
   colorScheme: 'normal' | 'deep-night';
-  simulateSensors: boolean; // TEST ONLY: emit IMU with zeroed compass on devices without a magnetometer
   setAimingAxis: (axis: SettingsState['aimingAxis']) => void;
   setStabilizationThreshold: (value: number) => void;
   setAudioEnabled: (enabled: boolean) => void;
@@ -21,7 +20,6 @@ interface SettingsState {
   setTriggerMethod: (method: 'imu' | 'volume') => void;
   setLanguage: (language: Locale) => void;
   setColorScheme: (scheme: 'normal' | 'deep-night') => void;
-  setSimulateSensors: (enabled: boolean) => void;
 }
 
 export const useSettings = create<SettingsState>()(
@@ -35,7 +33,6 @@ export const useSettings = create<SettingsState>()(
       triggerMethod: 'imu',
       language: 'en',
       colorScheme: 'normal',
-      simulateSensors: false,
       setAimingAxis: (aimingAxis) => set({ aimingAxis }),
       setStabilizationThreshold: (stabilizationThreshold) =>
         set({ stabilizationThreshold: Math.max(0.2, stabilizationThreshold) }),
@@ -45,7 +42,6 @@ export const useSettings = create<SettingsState>()(
       setTriggerMethod: (triggerMethod) => set({ triggerMethod }),
       setLanguage: (language) => set({ language }),
       setColorScheme: (colorScheme) => set({ colorScheme }),
-      setSimulateSensors: (simulateSensors) => set({ simulateSensors }),
     }),
     {
       name: 'meteor-pointer-settings',
@@ -58,7 +54,6 @@ export const useSettings = create<SettingsState>()(
           triggerMethod: state.triggerMethod ?? 'imu',
           language: state.language ?? 'en',
           colorScheme: state.colorScheme ?? 'normal',
-          simulateSensors: state.simulateSensors ?? false,
         };
       },
     },

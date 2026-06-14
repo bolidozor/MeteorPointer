@@ -32,21 +32,6 @@ async function ensurePermission(): Promise<boolean> {
   return result === PermissionsAndroid.RESULTS.GRANTED;
 }
 
-/** One-shot location fix (requests permission). Returns null if unavailable. */
-export async function getCurrentFix(): Promise<GeoFix | null> {
-  if (!native) {
-    return null;
-  }
-  if (!(await ensurePermission())) {
-    return null;
-  }
-  try {
-    return await native.getCurrentPosition();
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Polls the device location while `active`, returning the latest fix.
  *
