@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  PermissionsAndroid,
   Pressable,
   SafeAreaView,
   StatusBar,
@@ -12,6 +13,7 @@ import {
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
+import { Camera, CameraType } from 'react-native-camera-kit';
 
 import { api } from '@api/client';
 import { useDeviceStore } from '@auth/useDeviceStore';
@@ -20,6 +22,12 @@ import { useTranslation } from '@i18n/useTranslation';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList, 'WebLogin'>;
 
+/** A scanned QR may be the bare code or a deep link; pull the code out of both. */
+function extractCode(scanned: string): string {
+  const match = scanned.match(/code=([A-Za-z0-9-]+)/);
+  return (match ? match[1] : scanned).trim().toUpperCase();
+}
+
 export function WebLoginScreen(): React.JSX.Element {
   const navigation = useNavigation<Navigation>();
   const theme = useAdaptiveRedTheme();
@@ -27,15 +35,18 @@ export function WebLoginScreen(): React.JSX.Element {
   const getAccessToken = useDeviceStore((s) => s.getAccessToken);
   const route = useRoute<RouteProp<RootStackParamList, 'WebLogin'>>();
 
-  // Pre-filled when arriving from a scanned QR deep link (meteorpointer://weblogin?code=…).
   const [code, setCode] = useState(route.params?.code ?? '');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const scannedRef = useRef(false);
 
-  const canSubmit = code.trim().length >= 4 && !busy;
-
-  const onApprove = async () => {
+  const approve = async (codeArg?: string) => {
+    const value = (codeArg ?? code).trim().toUpperCase();
+    if (value.length < 4) {
+      return;
+    }
     setError(null);
     setDone(false);
     setBusy(true);
@@ -44,7 +55,7 @@ export function WebLoginScreen(): React.JSX.Element {
       if (!token) {
         throw new Error('Device is not connected');
       }
-      await api.approveWebLogin(token, code.trim().toUpperCase());
+      await api.approveWebLogin(token, value);
       setDone(true);
     } catch (e) {
       setError((e as Error).message);
@@ -53,12 +64,67 @@ export function WebLoginScreen(): React.JSX.Element {
     }
   };
 
+  const startScan = async () => {
+    setError(null);
+    const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+    if (result === PermissionsAndroid.RESULTS.GRANTED) {
+      scannedRef.current = false;
+      setScanning(true);
+    } else {
+      setError('Camera permission denied');
+    }
+  };
+
+  const onReadCode = (event: { nativeEvent: { codeStringValue: string } }) => {
+    if (scannedRef.current) {
+      return;
+    }
+    scannedRef.current = true;
+    const value = extractCode(event.nativeEvent.codeStringValue);
+    setScanning(false);
+    setCode(value);
+    approve(value);
+  };
+
+  if (scanning) {
+    return (
+      <View style={styles.cameraRoot}>
+        <StatusBar hidden />
+        <Camera
+          style={StyleSheet.absoluteFill}
+          cameraType={CameraType.Back}
+          scanBarcode
+          onReadCode={onReadCode}
+        />
+        <Pressable
+          style={[styles.cancelScan, { backgroundColor: theme.buttonSecondary }]}
+          onPress={() => setScanning(false)}
+        >
+          <Text style={[styles.buttonText, { color: theme.text }]}>{t.cancel}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const canSubmit = code.trim().length >= 4 && !busy;
+
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: theme.background }]}>
       <StatusBar hidden />
       <View style={styles.content}>
         <Text style={[styles.title, { color: theme.title }]}>{t.webLogin}</Text>
         <Text style={[styles.hint, { color: theme.muted }]}>{t.webLoginHint}</Text>
+
+        <Pressable
+          onPress={startScan}
+          style={({ pressed }) => [
+            styles.button,
+            { backgroundColor: theme.buttonPrimary },
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={[styles.buttonText, { color: theme.text }]}>⊡ {t.scanQr}</Text>
+        </Pressable>
 
         <Text style={[styles.label, { color: theme.muted }]}>{t.code}</Text>
         <TextInput
@@ -72,11 +138,11 @@ export function WebLoginScreen(): React.JSX.Element {
         />
 
         <Pressable
-          onPress={onApprove}
+          onPress={() => approve()}
           disabled={!canSubmit}
           style={({ pressed }) => [
             styles.button,
-            { backgroundColor: theme.buttonPrimary },
+            { backgroundColor: theme.buttonSecondary },
             !canSubmit && styles.disabled,
             pressed && styles.pressed,
           ]}
@@ -127,4 +193,13 @@ const styles = StyleSheet.create({
   spin: { marginTop: 8 },
   ok: { fontSize: 15, fontWeight: '700', marginTop: 8 },
   err: { fontSize: 13, marginTop: 8 },
+  cameraRoot: { flex: 1, backgroundColor: '#000' },
+  cancelScan: {
+    position: 'absolute',
+    bottom: 40,
+    alignSelf: 'center',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 40,
+  },
 });
