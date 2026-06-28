@@ -16,6 +16,7 @@ interface SessionStore {
   addManualEvent: () => MeteorEvent;
   addReport: (report: Omit<MeteorReport, 'id' | 'createdAt'>) => MeteorReport;
   updateReportParams: (id: string, params: EventParams) => void;
+  markSynced: (ids: string[]) => void;
   clearReports: () => void;
 }
 
@@ -97,6 +98,15 @@ export const useSessionStore = create<SessionStore>()(
         set((state) => ({
           reports: state.reports.map((r) => (r.id === id ? { ...r, params } : r)),
         })),
+      markSynced: (ids) =>
+        set((state) => {
+          const idSet = new Set(ids);
+          return {
+            reports: state.reports.map((r) =>
+              idSet.has(r.id) ? { ...r, synced: true } : r,
+            ),
+          };
+        }),
       clearReports: () => set({ reports: [] }),
     }),
     {

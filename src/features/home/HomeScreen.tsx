@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
+  BackHandler,
   Pressable,
   SafeAreaView,
   StatusBar,
@@ -7,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { useSessionStore } from '@features/sessions/useSessionStore';
@@ -22,11 +23,26 @@ export function HomeScreen(): React.JSX.Element {
   const t = useTranslation();
   const reports = useSessionStore((state) => state.reports);
   const events = useSessionStore((state) => state.events);
+  const unsyncedCount = useSessionStore(
+    (state) => state.reports.filter((r) => !r.synced).length,
+  );
 
   const lastEvent = events[0];
   const lastEventLabel = lastEvent
     ? new Date(lastEvent.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : null;
+
+  // On the home screen the hardware Back button quits the app (the in-app
+  // screens have their own back buttons), so there is a clear way to exit.
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        BackHandler.exitApp();
+        return true;
+      });
+      return () => sub.remove();
+    }, []),
+  );
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: theme.background }]}>
@@ -51,6 +67,19 @@ export function HomeScreen(): React.JSX.Element {
           <Text style={styles.startLabel}>{t.home.startButton}</Text>
           <Text style={styles.startSub}>{t.home.startSub}</Text>
         </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.webLoginButton,
+            { borderColor: theme.border },
+            pressed && styles.tilePressed,
+          ]}
+          onPress={() => navigation.navigate('WebLogin')}
+        >
+          <Text style={[styles.webLoginText, { color: theme.muted }]}>
+            ⌁ {t.account.webLogin}
+          </Text>
+        </Pressable>
       </View>
 
       <View style={styles.tiles}>
@@ -71,6 +100,13 @@ export function HomeScreen(): React.JSX.Element {
           label={t.home.tiles.guide}
           glyph="✦"
           onPress={() => navigation.navigate('HowToObserve')}
+          theme={theme}
+        />
+        <NavTile
+          label={t.account.tile}
+          glyph="⇅"
+          badge={unsyncedCount > 0 ? String(unsyncedCount) : undefined}
+          onPress={() => navigation.navigate('Account')}
           theme={theme}
         />
         <NavTile
@@ -97,6 +133,12 @@ export function HomeScreen(): React.JSX.Element {
             {t.home.noEvents}
           </Text>
         )}
+        <Pressable
+          onPress={() => BackHandler.exitApp()}
+          style={({ pressed }) => [styles.exitButton, pressed && styles.tilePressed]}
+        >
+          <Text style={[styles.exitText, { color: theme.muted }]}>✕ {t.account.exit}</Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -203,6 +245,18 @@ const styles = StyleSheet.create({
     color: '#00000088',
     letterSpacing: 1,
   },
+  webLoginButton: {
+    marginTop: 18,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+  },
+  webLoginText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
 
   tiles: {
     flexDirection: 'row',
@@ -257,5 +311,15 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 11,
     letterSpacing: 0.3,
+  },
+  exitButton: {
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  exitText: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
 });

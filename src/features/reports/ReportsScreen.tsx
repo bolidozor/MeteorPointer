@@ -13,6 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { useSessionStore } from '@features/sessions/useSessionStore';
 import type { MeteorReport } from '@features/sessions/sessionModels';
+import { flushOutbox } from '@sync/syncEngine';
 import { useAdaptiveRedTheme } from '@theme/useAdaptiveRedTheme';
 
 type Filter = 'all' | 'today' | 'week';
@@ -136,12 +137,15 @@ function ReportRow({
         <Pressable
           style={({ pressed }) => [
             styles.uploadButton,
-            { backgroundColor: theme.buttonSecondary },
+            { backgroundColor: report.synced ? theme.surface : theme.buttonSecondary },
             pressed && styles.buttonPressed,
           ]}
-          onPress={() => { /* TODO: upload to backend */ }}
+          disabled={report.synced}
+          onPress={() => flushOutbox()}
         >
-          <Text style={[styles.uploadText, { color: theme.muted }]}>Upload</Text>
+          <Text style={[styles.uploadText, { color: theme.muted }]}>
+            {report.synced ? 'Synced' : 'Upload'}
+          </Text>
         </Pressable>
       </View>
       <Metric

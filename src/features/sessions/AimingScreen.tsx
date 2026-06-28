@@ -11,6 +11,7 @@ import { useIsFocused } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { useImu } from '@native/useImu';
+import { GOOD_GPS_ACCURACY_M, isGoodFix, useLocation, type GeoFix } from '@native/useLocation';
 import { emitCue } from '@native/cues';
 import { useVolumeKey } from '@native/useVolumeKey';
 import { useSettings } from '@features/settings/useSettings';
@@ -39,8 +40,14 @@ export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
   const isFocused = useIsFocused();
 
   const imu = useImu();
+  const location = useLocation(isFocused);
+  const locationRef = useRef<GeoFix | null>(null);
   const addReport = useSessionStore((state) => state.addReport);
   const updateReportParams = useSessionStore((state) => state.updateReportParams);
+
+  useEffect(() => {
+    locationRef.current = location;
+  }, [location]);
 
   const [step, setStep] = useState<Step>('start');
   const [window, setWindow] = useState<{ alt: number; az: number }[]>([]);
@@ -129,7 +136,13 @@ export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
         Math.max(0, Math.min(1, 1 - (startPoint.jitter + point.jitter) / 20)) *
         Math.min(1, separation / 20);
 
-      const report = addReport({ eventTimestamp, startPoint, endPoint: point, quality });
+      const report = addReport({
+        eventTimestamp,
+        startPoint,
+        endPoint: point,
+        quality,
+        site: locationRef.current,
+      });
       reportIdRef.current = report.id;
       emitCue({ audioEnabled, hapticEnabled, kind: 'done' });
     }
@@ -218,6 +231,18 @@ export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
                 value={Number.isFinite(jitter) ? `${jitter.toFixed(2)}°` : 'n/a'}
                 theme={theme}
               />
+              <Metric
+                label="GPS"
+                value={location ? `±${location.accuracy.toFixed(0)} m` : 'acquiring…'}
+                theme={theme}
+              />
+              {!isGoodFix(location) && (
+                <Text style={[styles.gpsWarn, { color: theme.buttonDanger }]}>
+                  {location
+                    ? `⚠ Poloha jen ±${location.accuracy.toFixed(0)} m — počkej na přesný GPS fix (≤ ${GOOD_GPS_ACCURACY_M} m)`
+                    : '⚠ Čekám na GPS polohu — jdi pod volné nebe'}
+                </Text>
+              )}
               <Metric
                 label="Stable"
                 value={
@@ -367,6 +392,11 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 14,
     fontVariant: ['tabular-nums'],
+  },
+  gpsWarn: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
   },
   button: {
     borderRadius: 11,

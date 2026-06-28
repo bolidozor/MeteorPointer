@@ -46,7 +46,7 @@ export const useSettings = create<SettingsState>()(
     {
       name: 'meteor-pointer-settings',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 3,
+      version: 4,
       migrate: (persisted) => {
         const state = persisted as Partial<SettingsState>;
         return {

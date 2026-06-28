@@ -1,5 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  PermissionsAndroid,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -12,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { useImu } from '@native/useImu';
+import { isGoodFix, useLocation } from '@native/useLocation';
 import { useLowPassImu } from '@native/useLowPassImu';
 import { useSettings } from '@features/settings/useSettings';
 import { toOrientation } from '@features/sessions/orientation';
@@ -29,10 +32,6 @@ function accelToRollPitch(x: number, y: number, z: number): { roll: number; pitc
   const roll = Math.atan2(x, z) * (180 / Math.PI);
   const pitch = Math.atan2(-y, Math.sqrt(x * x + z * z)) * (180 / Math.PI);
   return { roll, pitch };
-}
-
-function normalizeAz(deg: number): number {
-  return ((deg % 360) + 360) % 360;
 }
 
 // ---------- Artificial Horizon ----------
@@ -312,6 +311,17 @@ export function SensorDebugScreen(): React.JSX.Element {
   const rawImu = useImu({ intervalMs: 50 });
   const imu = useLowPassImu(rawImu);
 
+  const gps = useLocation(true);
+  const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+    PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION).then(
+      setLocationGranted,
+    );
+  }, [gps]);
+
   const { roll, pitch } = useMemo(() => {
     if (!imu) return { roll: 0, pitch: 0 };
     return accelToRollPitch(imu.accel.x, imu.accel.y, imu.accel.z);
@@ -414,6 +424,45 @@ export function SensorDebugScreen(): React.JSX.Element {
               value={imu ? Math.sqrt(imu.mag.x ** 2 + imu.mag.y ** 2 + imu.mag.z ** 2).toFixed(1) : '—'}
               theme={theme}
             />
+          </View>
+        </View>
+
+        {/* GPS location */}
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.cardTitle, { color: theme.title }]}>GPS (poloha)</Text>
+          <View style={styles.sourceRow}>
+            <View style={[
+              styles.sourceBadge,
+              isGoodFix(gps)
+                ? { backgroundColor: '#1a3a1a', borderColor: '#4a9a4a' }
+                : gps
+                  ? { backgroundColor: '#3a2e1a', borderColor: '#9a8a4a' }
+                  : { backgroundColor: '#3a1a1a', borderColor: '#9a4a4a' },
+            ]}>
+              <Text style={[
+                styles.sourceBadgeText,
+                { color: isGoodFix(gps) ? '#7aff7a' : gps ? '#ffd87a' : '#ff7a7a' },
+              ]}>
+                {isGoodFix(gps)
+                  ? '● GPS fix'
+                  : gps
+                    ? '● Hrubá poloha (síť)'
+                    : locationGranted === false
+                      ? '○ Bez oprávnění'
+                      : '○ Hledám signál…'}
+              </Text>
+            </View>
+            {gps && (
+              <Text style={[styles.sourceDetail, { color: theme.muted }]}>
+                {`stáří ${Math.max(0, Math.round((Date.now() - gps.capturedAt) / 1000))} s`}
+              </Text>
+            )}
+          </View>
+          <View style={styles.grid}>
+            <DataCell label="Lat" value={gps ? gps.lat.toFixed(6) : '—'} theme={theme} />
+            <DataCell label="Lon" value={gps ? gps.lon.toFixed(6) : '—'} theme={theme} />
+            <DataCell label="±m" value={gps ? gps.accuracy.toFixed(0) : '—'} theme={theme} />
+            <DataCell label="Fix" value={gps ? 'ano' : 'ne'} theme={theme} />
           </View>
         </View>
 
