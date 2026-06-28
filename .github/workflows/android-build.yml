@@ -1,0 +1,122 @@
+name: Android Build
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun run test
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Name and rename APK
+        id: apk
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            VERSION="master-$(git rev-parse --short HEAD)"
+          fi
+          SRC=$(ls android/app/build/outputs/apk/release/*.apk | head -n1)
+          DEST="MeteorPointer-${VERSION}.apk"
+          cp "$SRC" "$DEST"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "apk=$DEST" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: meteorpointer-${{ steps.apk.outputs.version }}
+          path: ${{ steps.apk.outputs.apk }}
+          if-no-files-found: error
+
+    outputs:
+      version: ${{ steps.apk.outputs.version }}
+      apk: ${{ steps.apk.outputs.apk }}
+
+  deploy:
+    name: Deploy to server
+    needs: build
+    # Only deploy from master pushes and release tags, never from pull requests.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: meteorpointer-${{ needs.build.outputs.version }}
+          path: artifact
+
+      - name: Set up SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${SSH_PORT:-22}" -H "${SSH_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Upload and publish
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          VERSION: ${{ needs.build.outputs.version }}
+          APK: ${{ needs.build.outputs.apk }}
+        run: |
+          set -euo pipefail
+          PORT="${SSH_PORT:-22}"
+          SSH="ssh -i ~/.ssh/deploy_key -p ${PORT} ${SSH_USER}@${SSH_HOST}"
+          REMOTE_DIR="${DEPLOY_PATH}/builds/${VERSION}"
+
+          # Create the versioned build directory and copy the APK into it.
+          $SSH "mkdir -p '${REMOTE_DIR}'"
+          scp -i ~/.ssh/deploy_key -P "${PORT}" "artifact/${APK}" \
+            "${SSH_USER}@${SSH_HOST}:${REMOTE_DIR}/"
+
+          # 'latest' always points at the newest build (master or tag).
+          # 'release' points at the newest tagged release only.
+          $SSH "ln -sfn 'builds/${VERSION}' '${DEPLOY_PATH}/latest'"
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            $SSH "ln -sfn 'builds/${VERSION}' '${DEPLOY_PATH}/release'"
+          fi
+
+          echo "Deployed ${APK} to ${REMOTE_DIR}"
