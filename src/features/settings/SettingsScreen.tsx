@@ -32,6 +32,7 @@ export function SettingsScreen(): React.JSX.Element {
   const hapticEnabled = useSettings((state) => state.hapticEnabled);
   const backendUrl = useSettings((state) => state.backendUrl);
   const triggerMethod = useSettings((state) => state.triggerMethod);
+  const testMode = useSettings((state) => state.testMode);
 
   const setAimingAxis = useSettings((state) => state.setAimingAxis);
   const setStabilizationThreshold = useSettings((state) => state.setStabilizationThreshold);
@@ -39,6 +40,7 @@ export function SettingsScreen(): React.JSX.Element {
   const setHapticEnabled = useSettings((state) => state.setHapticEnabled);
   const setBackendUrl = useSettings((state) => state.setBackendUrl);
   const setTriggerMethod = useSettings((state) => state.setTriggerMethod);
+  const setTestMode = useSettings((state) => state.setTestMode);
   const language = useSettings((state) => state.language);
   const setLanguage = useSettings((state) => state.setLanguage);
   const colorScheme = useSettings((state) => state.colorScheme);
@@ -185,6 +187,12 @@ export function SettingsScreen(): React.JSX.Element {
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <SettingSwitch label="Audio cues" value={audioEnabled} onValueChange={setAudioEnabled} theme={theme} />
           <SettingSwitch label="Haptic cues" value={hapticEnabled} onValueChange={setHapticEnabled} theme={theme} />
+          <SettingSwitch label="Test mode" value={testMode} onValueChange={setTestMode} theme={theme} />
+          {testMode && (
+            <Text style={[styles.hint, { color: theme.muted }]}>
+              Reports saved now will be marked as test data.
+            </Text>
+          )}
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}> 

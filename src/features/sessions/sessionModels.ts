@@ -76,6 +76,7 @@ export interface MeteorReport {
   endPoint: AimPoint;
   createdAt: number;
   quality: number;
+  test?: boolean; // true for test/calibration reports that should not be treated as real meteors
   params?: EventParams;
   site?: ObservationSite | null; // GPS of the observation site; null if unavailable
   synced?: boolean; // true once the report has been accepted by the API

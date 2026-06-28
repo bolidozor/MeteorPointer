@@ -133,7 +133,9 @@ function ReportRow({
   return (
     <View style={[styles.reportCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <View style={styles.reportHeader}>
-        <Text style={[styles.reportTitle, { color: theme.title }]}>{new Date(report.createdAt).toLocaleString()}</Text>
+        <Text style={[styles.reportTitle, { color: theme.title }]}>
+          {new Date(report.createdAt).toLocaleString()}{report.test ? '  TEST' : ''}
+        </Text>
         <Pressable
           style={({ pressed }) => [
             styles.uploadButton,
@@ -159,6 +161,7 @@ function ReportRow({
         theme={theme}
       />
       <Metric label="Quality" value={`${(report.quality * 100).toFixed(0)} %`} theme={theme} />
+      <Metric label="Mode" value={report.test ? 'Test' : 'Observation'} theme={theme} />
       <Metric label="Event" value={new Date(report.eventTimestamp).toLocaleTimeString()} theme={theme} />
     </View>
   );

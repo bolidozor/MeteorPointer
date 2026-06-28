@@ -4,9 +4,10 @@ import { NativeModules, Vibration } from 'react-native';
 //   armed   – phone is face-down, detector armed (ready)
 //   trigger – flip detected, opening aiming screen
 //   stable  – aim is stable during aiming
-//   capture – a trajectory point was captured
+//   captureStart – START trajectory point was captured
+//   captureEnd – END trajectory point was captured
 //   done    – both points captured, session complete
-export type CueKind = 'armed' | 'trigger' | 'stable' | 'capture' | 'done';
+export type CueKind = 'armed' | 'trigger' | 'stable' | 'captureStart' | 'captureEnd' | 'done';
 
 interface CueOptions {
   audioEnabled: boolean;
@@ -20,7 +21,7 @@ export function emitCue({ audioEnabled, hapticEnabled, kind }: CueOptions): void
   }
 
   // Vibrate only on meaningful step completions, not on state readiness cues.
-  if (hapticEnabled && (kind === 'trigger' || kind === 'capture' || kind === 'done')) {
+  if (hapticEnabled && (kind === 'trigger' || kind === 'captureStart' || kind === 'captureEnd' || kind === 'done')) {
     vibrateSafely(kind);
   }
 }
@@ -31,8 +32,12 @@ function vibrateSafely(kind: CueKind): void {
       Vibration.vibrate([0, 50, 40, 80]);
       return;
     }
-    if (kind === 'capture') {
-      Vibration.vibrate([0, 60, 40, 100]);
+    if (kind === 'captureStart') {
+      Vibration.vibrate([0, 45]);
+      return;
+    }
+    if (kind === 'captureEnd') {
+      Vibration.vibrate([0, 45, 35, 85]);
       return;
     }
     if (kind === 'done') {
@@ -43,11 +48,21 @@ function vibrateSafely(kind: CueKind): void {
   }
 }
 
+let warnedMissingModule = false;
+
 function playSound(kind: CueKind): void {
+  const sm = NativeModules.SoundManager as { playSound?: (type: string) => void } | undefined;
+  if (!sm?.playSound) {
+    // Surface this once — silently doing nothing is what hid the broken audio before.
+    if (!warnedMissingModule) {
+      warnedMissingModule = true;
+      console.warn('[cues] SoundManager native module unavailable; audio cues disabled');
+    }
+    return;
+  }
   try {
-    const sm = NativeModules.SoundManager as { playSound?: (type: string) => void } | undefined;
-    sm?.playSound?.(kind);
-  } catch {
-    // Ignore on platforms where the module is unavailable.
+    sm.playSound(kind);
+  } catch (e) {
+    console.warn('[cues] playSound failed', e);
   }
 }

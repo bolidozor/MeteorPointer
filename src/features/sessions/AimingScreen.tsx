@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Pressable,
   SafeAreaView,
@@ -15,7 +15,15 @@ import { GOOD_GPS_ACCURACY_M, isGoodFix, useLocation, type GeoFix } from '@nativ
 import { emitCue } from '@native/cues';
 import { useVolumeKey } from '@native/useVolumeKey';
 import { useSettings } from '@features/settings/useSettings';
-import { angleDistanceDeg, averageOrientation, orientationJitter, toOrientation } from './orientation';
+import {
+  angleDistanceDeg,
+  createAimStabilityState,
+  resetAimStability,
+  toOrientation,
+  updateAimStability,
+  type AimStabilityPhase,
+  type OrientationPoint,
+} from './orientation';
 import type { AimPoint } from './sessionModels';
 import { useSessionStore } from './useSessionStore';
 import { useAdaptiveRedTheme } from '@theme/useAdaptiveRedTheme';
@@ -25,9 +33,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Aiming'>;
 
 type Step = 'start' | 'end' | 'done';
 
-const WINDOW_SIZE = 30;
-const MIN_SAMPLES = 10;
 const MIN_MOVEMENT_DEG = 8; // must move at least this far from start before end can be captured
+const QUIET_DURATION_MS = 100; // must remain still this long before auto-capture
 
 export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
   const { eventTimestamp } = route.params;
@@ -36,6 +43,7 @@ export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
   const audioEnabled = useSettings((state) => state.audioEnabled);
   const hapticEnabled = useSettings((state) => state.hapticEnabled);
   const triggerMethod = useSettings((state) => state.triggerMethod);
+  const testMode = useSettings((state) => state.testMode);
   const theme = useAdaptiveRedTheme();
   const isFocused = useIsFocused();
 
@@ -50,14 +58,31 @@ export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
   }, [location]);
 
   const [step, setStep] = useState<Step>('start');
-  const [window, setWindow] = useState<{ alt: number; az: number }[]>([]);
+  const [view, setView] = useState<{
+    jitter: number;
+    orientation: OrientationPoint | null;
+    stable: boolean;
+    phase: AimStabilityPhase;
+    samples: number;
+    quietMs: number;
+    hasMovedEnough: boolean;
+  }>({
+    jitter: 999,
+    orientation: null,
+    stable: false,
+    phase: 'settling',
+    samples: 0,
+    quietMs: 0,
+    hasMovedEnough: true,
+  });
+  const stabilityRef = useRef(createAimStabilityState('start'));
   const [startPoint, setStartPoint] = useState<AimPoint | null>(null);
   const [endPoint, setEndPoint] = useState<AimPoint | null>(null);
   const [showParams, setShowParams] = useState(false);
 
   const stableRef = useRef(false);
+  const lastKnownJitterRef = useRef(0);
   const captureLockRef = useRef(false);
-  const prevMovedRef = useRef(false);
   const reportIdRef = useRef<string | null>(null);
   const overlayVolumeRef = useRef<((key: 'up' | 'down') => void) | null>(null);
 
@@ -66,61 +91,65 @@ export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
       return;
     }
 
-    const next = toOrientation(imu, aimingAxis);
-    setWindow((prev) => [...prev, next].slice(-WINDOW_SIZE));
-  }, [imu, step, aimingAxis]);
+    const mode = step === 'start' ? 'start' : 'end';
+    const result = updateAimStability(stabilityRef.current, imu, aimingAxis, {
+      mode,
+      stabilizationThreshold,
+      startPoint,
+      minMovementDeg: MIN_MOVEMENT_DEG,
+      quietDurationMs: QUIET_DURATION_MS,
+    });
+
+    const wasStable = stableRef.current;
+    if (!wasStable && result.stable) {
+      emitCue({ audioEnabled, hapticEnabled, kind: 'stable' });
+    }
+    stableRef.current = result.stable;
+    const displayJitter = Number.isFinite(result.jitter) && result.jitter < 999
+      ? result.jitter
+      : lastKnownJitterRef.current;
+    lastKnownJitterRef.current = displayJitter;
+
+    setView({
+      jitter: displayJitter,
+      orientation: result.orientation,
+      stable: result.stable,
+      phase: result.phase,
+      samples: result.samples,
+      quietMs: result.quietMs,
+      hasMovedEnough: result.hasMovedEnough,
+    });
+  }, [imu, step, aimingAxis, stabilizationThreshold, startPoint, audioEnabled, hapticEnabled]);
 
   const hasRotVec = imu?.rotVec != null;
-  const orientation = useMemo(
-    () => hasRotVec && imu ? toOrientation(imu, aimingAxis) : averageOrientation(window),
-    [hasRotVec, imu, aimingAxis, window],
-  );
-  const jitter = useMemo(() => orientationJitter(window), [window]);
-
-  const stable = window.length >= MIN_SAMPLES && jitter <= stabilizationThreshold;
-
-  // For the second point: require meaningful movement away from the start point first
-  const hasMovedEnough = useMemo(() => {
-    if (step !== 'end' || !startPoint || !orientation) return true; // no constraint on first point
-    return angleDistanceDeg(orientation, startPoint) >= MIN_MOVEMENT_DEG;
-  }, [step, startPoint, orientation]);
-
-  useEffect(() => {
-    if (step !== 'end') {
-      prevMovedRef.current = false;
-      return;
-    }
-    if (hasMovedEnough && !prevMovedRef.current) {
-      setWindow([]);
-      stableRef.current = false;
-    }
-    prevMovedRef.current = hasMovedEnough;
-  }, [hasMovedEnough, step]);
-
-  useEffect(() => {
-    if (step === 'done') {
-      return;
-    }
-
-    if (stable && !stableRef.current) {
-      stableRef.current = true;
-      emitCue({ audioEnabled, hapticEnabled, kind: 'stable' });
-      return;
-    }
-
-    if (!stable && stableRef.current) {
-      stableRef.current = false;
-    }
-  }, [stable, step, audioEnabled, hapticEnabled]);
+  // Use the instantaneous fused orientation when available; fall back to the
+  // smoothed EMA mean on devices without a rotation-vector sensor.
+  const orientation = hasRotVec && imu ? toOrientation(imu, aimingAxis) : view.orientation;
+  const jitter = view.jitter;
+  const stable = view.stable;
+  const hasMovedEnough = step !== 'end' || view.hasMovedEnough;
 
   const capture = useCallback((point: AimPoint) => {
-    emitCue({ audioEnabled, hapticEnabled, kind: 'capture' });
+    emitCue({
+      audioEnabled,
+      hapticEnabled,
+      kind: step === 'start' ? 'captureStart' : 'captureEnd',
+    });
 
     if (step === 'start') {
       setStartPoint(point);
       setStep('end');
-      setWindow([]);
+      resetAimStability(stabilityRef.current, 'end');
       stableRef.current = false;
+      setView({
+        jitter: 999,
+        orientation: null,
+        stable: false,
+        phase: 'waitingForMovement',
+        samples: 0,
+        quietMs: 0,
+        hasMovedEnough: false,
+      });
       captureLockRef.current = false;
       return;
     }
@@ -141,6 +170,7 @@ export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
         startPoint,
         endPoint: point,
         quality,
+        test: testMode,
         site: locationRef.current,
       });
       reportIdRef.current = report.id;
@@ -148,7 +178,7 @@ export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
     }
 
     captureLockRef.current = false;
-  }, [step, startPoint, audioEnabled, hapticEnabled, addReport, eventTimestamp]);
+  }, [step, startPoint, audioEnabled, hapticEnabled, addReport, eventTimestamp, testMode]);
 
   // Auto-capture: fires when stable — only in 'imu' mode; second point also requires movement first
   useEffect(() => {
@@ -216,7 +246,7 @@ export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
                 {step === 'done' && 'Capture complete'}
               </Text>
               <Metric label="Style" value={`${theme.variant} (${theme.sourceLabel})`} theme={theme} />
-              <Metric label="Samples" value={String(window.length)} theme={theme} />
+              <Metric label="Samples" value={String(view.samples)} theme={theme} />
               <Metric
                 label="Current ALT/AZ"
                 value={
@@ -248,7 +278,7 @@ export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
                 value={
                   step === 'end' && !hasMovedEnough
                     ? '— waiting for movement'
-                    : stable ? 'YES' : `NO (<= ${stabilizationThreshold.toFixed(1)}°)`
+                    : stable ? 'YES' : `NO (${phaseLabel(view.phase)}, ${Math.round(view.quietMs)} ms)`
                 }
                 theme={theme}
               />
@@ -335,6 +365,19 @@ export function AimingScreen({ route, navigation }: Props): React.JSX.Element {
 function angularDistance(a: number, b: number): number {
   const diff = ((a - b + 540) % 360) - 180;
   return Math.abs(diff);
+}
+
+function phaseLabel(phase: AimStabilityPhase): string {
+  switch (phase) {
+    case 'waitingForMovement':
+      return 'waiting';
+    case 'moving':
+      return 'moving';
+    case 'settling':
+      return 'settling';
+    case 'stable':
+      return 'stable';
+  }
 }
 
 function Metric({

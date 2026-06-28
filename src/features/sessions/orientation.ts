@@ -6,6 +6,8 @@ export interface OrientationPoint {
 }
 
 type Axis = '+X' | '+Y' | '+Z';
+export type AimStabilityMode = 'start' | 'end';
+export type AimStabilityPhase = 'waitingForMovement' | 'moving' | 'settling' | 'stable';
 
 export function toOrientation(sample: ImuData, axis: Axis): OrientationPoint {
   if (sample.rotVec) {
@@ -116,6 +118,244 @@ export function orientationJitter(points: OrientationPoint[]): number {
 
   const sum = points.reduce((acc, p) => acc + angleDistanceDeg(p, mean) ** 2, 0);
   return Math.sqrt(sum / points.length);
+}
+
+/**
+ * Exponentially-weighted stability tracker.
+ *
+ * Replaces the fixed-window RMS: instead of giving every sample in a 2.4 s window
+ * equal weight (which makes the jitter drop abruptly when old noise leaves the
+ * window), we keep an exponential moving average of the orientation and of the
+ * squared angular deviation. The result is a smoothly-decaying `jitter` whose
+ * convergence time is governed by a single time constant — so stabilization takes
+ * a consistent amount of time instead of "sometimes slow, sometimes instant".
+ *
+ * `alt` is averaged arithmetically; `az` is averaged on the unit circle (cos/sin)
+ * so it wraps correctly around 0°/360°.
+ */
+export interface StabilityState {
+  alt: number;
+  cosAz: number;
+  sinAz: number;
+  variance: number; // EMA of squared angular deviation, deg²
+  count: number;
+}
+
+export function createStabilityState(): StabilityState {
+  return { alt: 0, cosAz: 1, sinAz: 0, variance: 0, count: 0 };
+}
+
+export function resetStability(state: StabilityState): void {
+  state.alt = 0;
+  state.cosAz = 1;
+  state.sinAz = 0;
+  state.variance = 0;
+  state.count = 0;
+}
+
+/** Current smoothed orientation of the tracker, or null before any sample. */
+export function stabilityMean(state: StabilityState): OrientationPoint | null {
+  if (state.count === 0) {
+    return null;
+  }
+  const az = normalizeAngle((Math.atan2(state.sinAz, state.cosAz) * 180) / Math.PI);
+  return { alt: state.alt, az };
+}
+
+/**
+ * Feed one orientation sample. `alpha` is the EMA smoothing factor in (0, 1];
+ * derive it from the sample interval and a target time constant:
+ * `alpha = dt / (tauMs + dt)`. Returns the running jitter (RMS deviation, deg)
+ * and the smoothed orientation. Jitter is 999 until the first sample lands.
+ */
+export function updateStability(
+  state: StabilityState,
+  point: OrientationPoint,
+  alpha: number,
+): { jitter: number; orientation: OrientationPoint } {
+  if (state.count === 0) {
+    const rad = (point.az * Math.PI) / 180;
+    state.alt = point.alt;
+    state.cosAz = Math.cos(rad);
+    state.sinAz = Math.sin(rad);
+    state.variance = 0;
+    state.count = 1;
+    return { jitter: 999, orientation: { alt: point.alt, az: point.az } };
+  }
+
+  // Deviation of the new sample from the current mean, before updating the mean.
+  const mean = stabilityMean(state)!;
+  const dev = angleDistanceDeg(point, mean);
+
+  const rad = (point.az * Math.PI) / 180;
+  state.alt += alpha * (point.alt - state.alt);
+  state.cosAz += alpha * (Math.cos(rad) - state.cosAz);
+  state.sinAz += alpha * (Math.sin(rad) - state.sinAz);
+  state.variance += alpha * (dev * dev - state.variance);
+  state.count += 1;
+
+  return { jitter: Math.sqrt(state.variance), orientation: stabilityMean(state)! };
+}
+
+export interface AimStabilityState {
+  mode: AimStabilityMode;
+  phase: AimStabilityPhase;
+  samples: number;
+  points: OrientationPoint[];
+  previousOrientation: OrientationPoint | null;
+  previousTimestamp: number | null;
+  quietSince: number | null;
+  quietMs: number;
+  jitter: number;
+  orientation: OrientationPoint | null;
+  hasMovedEnough: boolean;
+}
+
+export interface AimStabilityOptions {
+  mode: AimStabilityMode;
+  stabilizationThreshold: number;
+  startPoint?: OrientationPoint | null;
+  minMovementDeg?: number;
+  quietDurationMs?: number;
+  stillSpeedDegPerSec?: number;
+  stillGyroRadPerSec?: number;
+  movementSpeedDegPerSec?: number;
+  movementGyroRadPerSec?: number;
+  jitterWindowSamples?: number;
+}
+
+export interface AimStabilityResult {
+  orientation: OrientationPoint;
+  jitter: number;
+  stable: boolean;
+  phase: AimStabilityPhase;
+  samples: number;
+  quietMs: number;
+  hasMovedEnough: boolean;
+}
+
+const DEFAULT_MIN_MOVEMENT_DEG = 8;
+const DEFAULT_QUIET_DURATION_MS = 900;
+const DEFAULT_STILL_SPEED_DEG_PER_SEC = 3;
+const DEFAULT_STILL_GYRO_RAD_PER_SEC = 0.08;
+const DEFAULT_MOVEMENT_SPEED_DEG_PER_SEC = 12;
+const DEFAULT_MOVEMENT_GYRO_RAD_PER_SEC = 0.25;
+const DEFAULT_JITTER_WINDOW_SAMPLES = 10;
+
+export function createAimStabilityState(mode: AimStabilityMode = 'start'): AimStabilityState {
+  return {
+    mode,
+    phase: mode === 'end' ? 'waitingForMovement' : 'settling',
+    samples: 0,
+    points: [],
+    previousOrientation: null,
+    previousTimestamp: null,
+    quietSince: null,
+    quietMs: 0,
+    jitter: 999,
+    orientation: null,
+    hasMovedEnough: mode === 'start',
+  };
+}
+
+export function resetAimStability(state: AimStabilityState, mode: AimStabilityMode = state.mode): void {
+  state.mode = mode;
+  state.phase = mode === 'end' ? 'waitingForMovement' : 'settling';
+  state.samples = 0;
+  state.points = [];
+  state.previousOrientation = null;
+  state.previousTimestamp = null;
+  state.quietSince = null;
+  state.quietMs = 0;
+  state.jitter = 999;
+  state.orientation = null;
+  state.hasMovedEnough = mode === 'start';
+}
+
+export function updateAimStability(
+  state: AimStabilityState,
+  sample: ImuData,
+  axis: Axis,
+  options: AimStabilityOptions,
+): AimStabilityResult {
+  if (state.mode !== options.mode) {
+    resetAimStability(state, options.mode);
+  }
+
+  const point = toOrientation(sample, axis);
+  const timestamp = sample.timestamp;
+  const minMovementDeg = options.minMovementDeg ?? DEFAULT_MIN_MOVEMENT_DEG;
+  const quietDurationMs = options.quietDurationMs ?? DEFAULT_QUIET_DURATION_MS;
+  const stillSpeedDegPerSec = options.stillSpeedDegPerSec ?? DEFAULT_STILL_SPEED_DEG_PER_SEC;
+  const stillGyroRadPerSec = options.stillGyroRadPerSec ?? DEFAULT_STILL_GYRO_RAD_PER_SEC;
+  const movementSpeedDegPerSec = options.movementSpeedDegPerSec ?? DEFAULT_MOVEMENT_SPEED_DEG_PER_SEC;
+  const movementGyroRadPerSec = options.movementGyroRadPerSec ?? DEFAULT_MOVEMENT_GYRO_RAD_PER_SEC;
+  const jitterWindowSamples = options.jitterWindowSamples ?? DEFAULT_JITTER_WINDOW_SAMPLES;
+
+  const dtSec =
+    state.previousTimestamp !== null
+      ? Math.max(0.001, (timestamp - state.previousTimestamp) / 1000)
+      : 0;
+  const angularSpeed =
+    state.previousOrientation && dtSec > 0
+      ? angleDistanceDeg(point, state.previousOrientation) / dtSec
+      : 0;
+  const gyroNorm = Math.sqrt(sample.gyro.x ** 2 + sample.gyro.y ** 2 + sample.gyro.z ** 2);
+
+  const hadMovedEnough = state.hasMovedEnough;
+  const hasMovedEnough =
+    options.mode === 'start' ||
+    (options.startPoint ? angleDistanceDeg(point, options.startPoint) >= minMovementDeg : false);
+
+  state.samples += 1;
+  state.orientation = point;
+  state.points =
+    !hadMovedEnough && hasMovedEnough
+      ? [point]
+      : [...state.points, point].slice(-jitterWindowSamples);
+  state.jitter = orientationJitter(state.points);
+  state.hasMovedEnough = hasMovedEnough;
+
+  if (!hasMovedEnough) {
+    state.phase = 'waitingForMovement';
+    state.quietSince = null;
+    state.quietMs = 0;
+  } else {
+    const moving = angularSpeed >= movementSpeedDegPerSec || gyroNorm >= movementGyroRadPerSec;
+    const still =
+      angularSpeed <= stillSpeedDegPerSec &&
+      gyroNorm <= stillGyroRadPerSec &&
+      state.jitter <= options.stabilizationThreshold;
+
+    if (moving) {
+      state.phase = 'moving';
+      state.points = [point];
+      state.jitter = 999;
+      state.quietSince = null;
+      state.quietMs = 0;
+    } else if (still) {
+      state.quietSince = state.quietSince ?? timestamp;
+      state.quietMs = timestamp - state.quietSince;
+      state.phase = state.quietMs >= quietDurationMs ? 'stable' : 'settling';
+    } else {
+      state.phase = 'settling';
+      state.quietSince = null;
+      state.quietMs = 0;
+    }
+  }
+
+  state.previousOrientation = point;
+  state.previousTimestamp = timestamp;
+
+  return {
+    orientation: point,
+    jitter: state.jitter,
+    stable: state.phase === 'stable',
+    phase: state.phase,
+    samples: state.samples,
+    quietMs: state.quietMs,
+    hasMovedEnough: state.hasMovedEnough,
+  };
 }
 
 export function angleDistanceDeg(a: OrientationPoint, b: OrientationPoint): number {
